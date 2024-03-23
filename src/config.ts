@@ -18,10 +18,13 @@ export const TICKER_BASKET: string[] = ["ETHUSDT", "WIFUSDT", "DOGEUSDT", "FTMUS
 
 // Represented as decimals: 1% => 0.01
 export const STOP_LOSS_PERCENTAGE: number = 0.05;
-export const TAKE_PROFIT_PERCENTAGE: number = 0.20;
 
 // Testnet mode: if false, you'll post orders to Bybit in production (e.g., you'll lose real money)
 export const TESTNET: boolean = false;
 
 //only necessary if hosted via digitalocean
 export const DIGITALOCEAN_PORT = 8080;
+
+// if set to true, the script won't close your filled positions automatically.
+export const MANUALLY_CLOSE_POSITIONS: boolean = true;
+export const TAKE_PROFIT_PERCENTAGE: number = 0.2;

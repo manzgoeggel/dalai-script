@@ -1,7 +1,7 @@
 import color from "ansi-colors";
 import { USDMClient } from "binance";
 import dotenv from "dotenv";
-import { DIGITALOCEAN_PORT, POSITION_ADJUSTMENT_INTERVAL, TESTNET } from "./config";
+import { DIGITALOCEAN_PORT, MANUALLY_CLOSE_POSITIONS, POSITION_ADJUSTMENT_INTERVAL, TESTNET } from "./config";
 import { cancelAllOpenBasketOrders, postOrdersForBasket, usdmarginedWebSocket } from "./modules";
 import express from "express";
 dotenv.config();
@@ -40,8 +40,10 @@ app.listen(DIGITALOCEAN_PORT);
 		//when starting the script, we want to, for security, make sure that all open orders are cancelled
 		await cancelAllOpenBasketOrders(client);
 
-		//this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
-		await usdmarginedWebSocket(client);
+		if (!MANUALLY_CLOSE_POSITIONS) {
+			//this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
+			await usdmarginedWebSocket(client);
+		}
 
 		//trigger postOrders initially
 		await postOrdersForBasket(client);
