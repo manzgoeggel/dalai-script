@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+      "target": "es5", // Set to the ECMAScript target version (es5 is widely supported)
+      "module": "commonjs", // Compile modules to commonjs for Node.js
+      "strict": true, // Enable all strict type-checking options
+      "esModuleInterop": true, // Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports
+      "forceConsistentCasingInFileNames": true, // Disallow inconsistently-cased references to the same file.
+      "skipLibCheck": true, // Skip type checking of declaration files.
+      "outDir": "./dist" // Redirect output structure to the directory.
+    },
+    "include": ["src/**/*"], // Include all files in src directory
+    "exclude": ["node_modules", "dist"] // Exclude node_modules and dist directories
+  }
+  
