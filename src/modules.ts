@@ -1,5 +1,13 @@
 import { DefaultLogger, MarkPrice, USDMClient, WebsocketClient } from "binance";
-import { MARK_PRICE_DISCOUNT_RATE, STOP_LOSS_PERCENTAGE, TAKE_PROFIT_PERCENTAGE, TICKER_BASKET, TOTAL_POSITION_SIZE_USD } from "./config";
+import {
+	MARK_PRICE_DISCOUNT_RATE,
+	MARK_PRICE_DISCOUNT_RATE_PER_TOKEN,
+	SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN,
+	STOP_LOSS_PERCENTAGE,
+	TAKE_PROFIT_PERCENTAGE,
+	TICKER_BASKET,
+	TOTAL_POSITION_SIZE_USD,
+} from "./config";
 import color from "ansi-colors";
 
 export async function cancelAllOpenBasketOrders(client: USDMClient): Promise<void> {
@@ -53,14 +61,30 @@ export async function postOrdersForBasket(client: USDMClient): Promise<void> {
 		throw new Error("Define at least one ticker in TICKER_BASKET.");
 	}
 
-	if (MARK_PRICE_DISCOUNT_RATE < 0 || MARK_PRICE_DISCOUNT_RATE >= 1) {
-		throw new Error("MARK_PRICE_DISCOUNT_RATE must be greater than 0 and less than 1");
+	if (SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN) {
+		if (MARK_PRICE_DISCOUNT_RATE_PER_TOKEN.length !== TICKER_BASKET.length) {
+			throw new Error("MARK_PRICE_DISCOUNT_RATE_PER_TOKEN array length must be equal to TICKER_BASKET array length!");
+		}
+
+		const check = MARK_PRICE_DISCOUNT_RATE_PER_TOKEN.some((discount) => discount < 0 || discount >= 1);
+
+		if (check) {
+			throw new Error("Discounts in MARK_PRICE_DISCOUNT_RATE_PER_TOKEN must be greater than 0 and less than 1.");
+		}
+	}
+
+	if (!SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN) {
+		if (MARK_PRICE_DISCOUNT_RATE < 0 || MARK_PRICE_DISCOUNT_RATE >= 1) {
+			throw new Error("MARK_PRICE_DISCOUNT_RATE must be greater than 0 and less than 1");
+		}
 	}
 
 	//rounds each position to two decimals
 	const positionSizeForEachTicker = Math.round((TOTAL_POSITION_SIZE_USD / TICKER_BASKET.length) * 100) / 100;
-
+	let counter = 0;
 	for (const ticker of TICKER_BASKET) {
+		const discount = SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN ? MARK_PRICE_DISCOUNT_RATE_PER_TOKEN[counter] : MARK_PRICE_DISCOUNT_RATE;
+		counter++;
 		console.log("posting order for: ", ticker);
 		const fetchedTicker = (await client.getMarkPrice({ symbol: ticker, isIsolated: "FALSE" })) as MarkPrice;
 
@@ -68,8 +92,8 @@ export async function postOrdersForBasket(client: USDMClient): Promise<void> {
 
 		const { roundByDecimals, quantityDecimals } = getDecimals(markPrice);
 
-		const bidPrice = Math.round(markPrice * (1 - MARK_PRICE_DISCOUNT_RATE) * roundByDecimals) / roundByDecimals;
-		const stopLossPrice = Math.round(bidPrice * (1 - STOP_LOSS_PERCENTAGE) * roundByDecimals) / roundByDecimals;
+		const bidPrice = Math.round(markPrice * (1 - discount) * roundByDecimals) / roundByDecimals;
+		const stopLossPrice = Math.round(bidPrice * (1 - discount) * roundByDecimals) / roundByDecimals;
 
 		const quantity = Math.round((positionSizeForEachTicker / bidPrice) * quantityDecimals) / quantityDecimals;
 
@@ -105,9 +129,9 @@ export async function postOrdersForBasket(client: USDMClient): Promise<void> {
 		if (order.length > 0) {
 			console.log(
 				color.greenBright(
-					`Successfully set ${ticker} bid @${bidPrice} for $${positionSizeForEachTicker} notional, with SL at ${stopLossPrice} (-${
-						STOP_LOSS_PERCENTAGE * 100
-					}%)`
+					`Successfully set ${ticker} bid @${bidPrice} (-${
+						discount * 100
+					}% from mark price) for $${positionSizeForEachTicker} notional, with SL at ${stopLossPrice} (-${STOP_LOSS_PERCENTAGE * 100}%)`
 				)
 			);
 		}

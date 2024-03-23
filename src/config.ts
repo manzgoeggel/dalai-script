@@ -8,6 +8,21 @@ export const TOTAL_POSITION_SIZE_USD: number = 500;
 export const POSITION_ADJUSTMENT_INTERVAL: number = 3_600;
 
 /**
+ * If true, sets mark price discount for each token (TICKER_BASKET) individually
+ *
+ */
+export const SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN: boolean = false;
+
+/**
+ * Sets bids x% below current mark price, for each INDIVIDUAL ticker in TICKER_BASKET
+ * @in decimals (1% => 0.01)
+ * @in greater than 0 & less than 1
+ * @in the array must have the same length as TICKER_BASKET
+ */
+
+export const MARK_PRICE_DISCOUNT_RATE_PER_TOKEN: number[] = [0.3, 0.25, 0.19, 0.15];
+
+/**
  * Sets bids x% below current mark price, for each ticker in TICKER_BASKET
  * @in decimals (1% => 0.01)
  * @in greater than 0 & less than 1

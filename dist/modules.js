@@ -116,7 +116,7 @@ function getDecimals(markPrice) {
 }
 function postOrdersForBasket(client) {
     return __awaiter(this, void 0, void 0, function () {
-        var positionSizeForEachTicker, _i, TICKER_BASKET_2, ticker, fetchedTicker, markPrice, _a, roundByDecimals, quantityDecimals, bidPrice, stopLossPrice, quantity, order;
+        var check, positionSizeForEachTicker, counter, _i, TICKER_BASKET_2, ticker, discount, fetchedTicker, markPrice, _a, roundByDecimals, quantityDecimals, bidPrice, stopLossPrice, quantity, order;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
@@ -124,23 +124,37 @@ function postOrdersForBasket(client) {
                     if (config_1.TICKER_BASKET.length < 1) {
                         throw new Error("Define at least one ticker in TICKER_BASKET.");
                     }
-                    if (config_1.MARK_PRICE_DISCOUNT_RATE < 0 || config_1.MARK_PRICE_DISCOUNT_RATE >= 1) {
-                        throw new Error("MARK_PRICE_DISCOUNT_RATE must be greater than 0 and less than 1");
+                    if (config_1.SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN) {
+                        if (config_1.MARK_PRICE_DISCOUNT_RATE_PER_TOKEN.length !== config_1.TICKER_BASKET.length) {
+                            throw new Error("MARK_PRICE_DISCOUNT_RATE_PER_TOKEN array length must be equal to TICKER_BASKET array length!");
+                        }
+                        check = config_1.MARK_PRICE_DISCOUNT_RATE_PER_TOKEN.some(function (discount) { return discount < 0 || discount >= 1; });
+                        if (check) {
+                            throw new Error("Discounts in MARK_PRICE_DISCOUNT_RATE_PER_TOKEN must be greater than 0 and less than 1.");
+                        }
+                    }
+                    if (!config_1.SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN) {
+                        if (config_1.MARK_PRICE_DISCOUNT_RATE < 0 || config_1.MARK_PRICE_DISCOUNT_RATE >= 1) {
+                            throw new Error("MARK_PRICE_DISCOUNT_RATE must be greater than 0 and less than 1");
+                        }
                     }
                     positionSizeForEachTicker = Math.round((config_1.TOTAL_POSITION_SIZE_USD / config_1.TICKER_BASKET.length) * 100) / 100;
+                    counter = 0;
                     _i = 0, TICKER_BASKET_2 = config_1.TICKER_BASKET;
                     _b.label = 1;
                 case 1:
                     if (!(_i < TICKER_BASKET_2.length)) return [3 /*break*/, 5];
                     ticker = TICKER_BASKET_2[_i];
+                    discount = config_1.SET_MARK_PRICE_DISCOUNT_RATE_PER_TOKEN ? config_1.MARK_PRICE_DISCOUNT_RATE_PER_TOKEN[counter] : config_1.MARK_PRICE_DISCOUNT_RATE;
+                    counter++;
                     console.log("posting order for: ", ticker);
                     return [4 /*yield*/, client.getMarkPrice({ symbol: ticker, isIsolated: "FALSE" })];
                 case 2:
                     fetchedTicker = (_b.sent());
                     markPrice = parseFloat(fetchedTicker.markPrice);
                     _a = getDecimals(markPrice), roundByDecimals = _a.roundByDecimals, quantityDecimals = _a.quantityDecimals;
-                    bidPrice = Math.round(markPrice * (1 - config_1.MARK_PRICE_DISCOUNT_RATE) * roundByDecimals) / roundByDecimals;
-                    stopLossPrice = Math.round(bidPrice * (1 - config_1.STOP_LOSS_PERCENTAGE) * roundByDecimals) / roundByDecimals;
+                    bidPrice = Math.round(markPrice * (1 - discount) * roundByDecimals) / roundByDecimals;
+                    stopLossPrice = Math.round(bidPrice * (1 - discount) * roundByDecimals) / roundByDecimals;
                     quantity = Math.round((positionSizeForEachTicker / bidPrice) * quantityDecimals) / quantityDecimals;
                     return [4 /*yield*/, client.submitMultipleOrders([
                             //post buy order
@@ -172,7 +186,7 @@ function postOrdersForBasket(client) {
                 case 3:
                     order = _b.sent();
                     if (order.length > 0) {
-                        console.log(ansi_colors_1.default.greenBright("Successfully set ".concat(ticker, " bid @").concat(bidPrice, " for $").concat(positionSizeForEachTicker, " notional, with SL at ").concat(stopLossPrice, " (-").concat(config_1.STOP_LOSS_PERCENTAGE * 100, "%)")));
+                        console.log(ansi_colors_1.default.greenBright("Successfully set ".concat(ticker, " bid @").concat(bidPrice, " (-").concat(discount * 100, "% from mark price) for $").concat(positionSizeForEachTicker, " notional, with SL at ").concat(stopLossPrice, " (-").concat(config_1.STOP_LOSS_PERCENTAGE * 100, "%)")));
                     }
                     _b.label = 4;
                 case 4:
