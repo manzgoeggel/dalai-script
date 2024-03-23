@@ -54,6 +54,7 @@ var ansi_colors_1 = __importDefault(require("ansi-colors"));
 var binance_1 = require("binance");
 var dotenv_1 = __importDefault(require("dotenv"));
 var config_1 = require("./config");
+var modules_1 = require("./modules");
 dotenv_1.default.config();
 function cancelAllOpenOrdersForBasket(client) {
     return __awaiter(this, void 0, void 0, function () {
@@ -79,91 +80,6 @@ function cancelAllOpenOrdersForBasket(client) {
                     _i++;
                     return [3 /*break*/, 1];
                 case 4: return [2 /*return*/];
-            }
-        });
-    });
-}
-function postOrdersForBasket(client) {
-    return __awaiter(this, void 0, void 0, function () {
-        var positionSizeForEachTicker, _i, TICKER_BASKET_2, ticker, fetchedTicker, markPrice, roundByDecimals, quantityDecimals, bidPrice, stopLossPrice, quantity, order;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    console.log("posting orders for basket...");
-                    if (config_1.TICKER_BASKET.length < 1) {
-                        throw new Error("Define at least one ticker in TICKER_BASKET.");
-                    }
-                    if (config_1.MARK_PRICE_DISCOUNT_RATE < 0 || config_1.MARK_PRICE_DISCOUNT_RATE >= 1) {
-                        throw new Error("MARK_PRICE_DISCOUNT_RATE must be greater than 0 and less than 1");
-                    }
-                    positionSizeForEachTicker = Math.round((config_1.TOTAL_POSITION_SIZE_USD / config_1.TICKER_BASKET.length) * 100) / 100;
-                    _i = 0, TICKER_BASKET_2 = config_1.TICKER_BASKET;
-                    _a.label = 1;
-                case 1:
-                    if (!(_i < TICKER_BASKET_2.length)) return [3 /*break*/, 5];
-                    ticker = TICKER_BASKET_2[_i];
-                    console.log("posting order for: ", ticker);
-                    return [4 /*yield*/, client.getMarkPrice({ symbol: ticker, isIsolated: "FALSE" })];
-                case 2:
-                    fetchedTicker = (_a.sent());
-                    markPrice = parseFloat(fetchedTicker.markPrice);
-                    roundByDecimals = 0;
-                    if (markPrice >= 5) {
-                        roundByDecimals = 100;
-                    }
-                    else if (markPrice >= 5) {
-                        roundByDecimals = 1000;
-                    }
-                    else {
-                        roundByDecimals = 10000;
-                    }
-                    quantityDecimals = 0;
-                    if (markPrice >= 1000) {
-                        quantityDecimals = 1000;
-                    }
-                    else {
-                        quantityDecimals = 1;
-                    }
-                    bidPrice = Math.round(markPrice * (1 - config_1.MARK_PRICE_DISCOUNT_RATE) * roundByDecimals) / roundByDecimals;
-                    stopLossPrice = Math.round(bidPrice * (1 - config_1.STOP_LOSS_PERCENTAGE) * roundByDecimals) / roundByDecimals;
-                    quantity = Math.round((positionSizeForEachTicker / bidPrice) * quantityDecimals) / quantityDecimals;
-                    return [4 /*yield*/, client.submitMultipleOrders([
-                            //post buy order
-                            {
-                                symbol: ticker,
-                                side: "BUY",
-                                type: "LIMIT",
-                                positionSide: "BOTH",
-                                quantity: quantity.toString(),
-                                price: bidPrice.toString(),
-                                timeInForce: "GTC",
-                                workingType: "MARK_PRICE",
-                            },
-                            //post SL
-                            {
-                                symbol: ticker,
-                                side: "SELL",
-                                positionSide: "BOTH",
-                                //@TODO discuss with gambid
-                                type: "STOP_MARKET",
-                                reduceOnly: "true",
-                                quantity: quantity.toString(),
-                                stopPrice: stopLossPrice.toString(),
-                                timeInForce: "GTC",
-                                workingType: "MARK_PRICE",
-                                priceProtect: "TRUE",
-                            },
-                        ])];
-                case 3:
-                    order = _a.sent();
-                    if (order.length > 0) {
-                        console.log(ansi_colors_1.default.greenBright("Successfully set ".concat(ticker, " bid @").concat(bidPrice, " for $").concat(positionSizeForEachTicker, " notional, with SL at ").concat(stopLossPrice, " (-").concat(config_1.STOP_LOSS_PERCENTAGE * 100, "%)")));
-                    }
-                    _a.label = 4;
-                case 4:
-                    _i++;
-                    return [3 /*break*/, 1];
-                case 5: return [2 /*return*/];
             }
         });
     });
@@ -194,8 +110,7 @@ function webSocket(client) {
                     api_key: API_KEY,
                     api_secret: API_SECRET,
                     beautify: true,
-                    // Disable ping/pong ws heartbeat mechanism (not recommended)
-                    // disableHeartbeat: true
+                    //disableHeartbeat: true
                 }, logger);
                 wsClient.on("formattedMessage", function (data) { return __awaiter(_this, void 0, void 0, function () {
                     var formattedMessage, order, roundByDecimals, filledPrice, takeProfitPrice, tpOrder;
@@ -204,7 +119,6 @@ function webSocket(client) {
                             case 0:
                                 formattedMessage = JSON.stringify(data, null, 2);
                                 order = JSON.parse(formattedMessage).order;
-                                console.log("order", order);
                                 if (!((order === null || order === void 0 ? void 0 : order.orderStatus) !== undefined && order.orderStatus === "FILLED")) return [3 /*break*/, 2];
                                 roundByDecimals = 0;
                                 filledPrice = order.lastFilledPrice;
@@ -235,7 +149,7 @@ function webSocket(client) {
                                     })];
                             case 1:
                                 tpOrder = _a.sent();
-                                console.log(ansi_colors_1.default.blueBright("ORDER: "), tpOrder);
+                                console.log(ansi_colors_1.default.green("Successfully set TP order @".concat(takeProfitPrice, " (+").concat(config_1.TAKE_PROFIT_PERCENTAGE * 100, "%)")));
                                 _a.label = 2;
                             case 2: return [2 /*return*/];
                         }
@@ -244,7 +158,7 @@ function webSocket(client) {
                 wsClient.subscribeUsdFuturesUserDataStream();
             }
             catch (err) {
-                console.log("err", err);
+                console.log(ansi_colors_1.default.red("err"), err);
             }
             return [2 /*return*/];
         });
@@ -268,13 +182,15 @@ function webSocket(client) {
                     api_key: API_KEY,
                     api_secret: API_SECRET,
                 }, undefined, config_1.TESTNET);
+                //this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
                 // await webSocket(client);
-                //trigger postOrders initially
-                return [4 /*yield*/, postOrdersForBasket(client)];
+                return [4 /*yield*/, (0, modules_1.cancelAllOpenBasketOrders)(client)];
             case 1:
+                //this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
                 // await webSocket(client);
-                //trigger postOrders initially
                 _b.sent();
+                //trigger postOrders initially
+                // await postOrdersForBasket(client);
                 //start interval
                 setInterval(function () { return __awaiter(void 0, void 0, void 0, function () {
                     return __generator(this, function (_a) {

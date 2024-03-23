@@ -22,3 +22,6 @@ export const TAKE_PROFIT_PERCENTAGE: number = 0.20;
 
 // Testnet mode: if false, you'll post orders to Bybit in production (e.g., you'll lose real money)
 export const TESTNET: boolean = false;
+
+//only necessary if hosted via digitalocean
+export const DIGITALOCEAN_PORT = 8080;

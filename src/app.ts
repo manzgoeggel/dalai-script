@@ -1,107 +1,18 @@
 import color from "ansi-colors";
-import { DefaultLogger, USDMClient, WebsocketClient } from "binance";
+import { USDMClient } from "binance";
 import dotenv from "dotenv";
-import { POSITION_ADJUSTMENT_INTERVAL, TAKE_PROFIT_PERCENTAGE, TESTNET, TICKER_BASKET } from "./config";
-import { postOrdersForBasket } from "./modules";
+import { DIGITALOCEAN_PORT, POSITION_ADJUSTMENT_INTERVAL, TESTNET } from "./config";
+import { cancelAllOpenBasketOrders, postOrdersForBasket, usdmarginedWebSocket } from "./modules";
+import express from "express";
 dotenv.config();
-export type numberInString = string | number;
-export interface MarkPrice {
-	symbol: string;
-	markPrice: numberInString;
-	indexPrice: numberInString;
-	estimatedSettlePrice: numberInString;
-	lastFundingRate: numberInString;
-	interestRate: numberInString;
-	nextFundingTime: number;
-	time: number;
-}
 
-async function cancelAllOpenOrdersForBasket(client: USDMClient): Promise<void> {
-	console.log("cancelAllOpenOrdersForBasket");
-	for (const ticker of TICKER_BASKET) {
-		const result = await client.cancelAllOpenOrders({
-			symbol: ticker,
-			isIsolated: "FALSE",
-		});
+//create a http server for the health checks (digital ocean)
+const app = express();
+app.get("/", (req, res) => {
+	res.send(`server is on at port ${DIGITALOCEAN_PORT}`);
+});
 
-		console.log({ result });
-	}
-}
-
-const ignoredSillyLogMsgs = ["Sending ping", "Received pong, clearing pong timer", "Received ping, sending pong frame"];
-const logger = {
-	...DefaultLogger,
-	//@ts-expect-error
-	silly: (msg, context) => {
-		if (ignoredSillyLogMsgs.includes(msg)) {
-			return;
-		}
-		console.log(JSON.stringify({ msg, context }));
-	},
-};
-
-async function webSocket(client: USDMClient) {
-	try {
-		const [API_KEY, API_SECRET]: (string | undefined)[] = [process.env.API_KEY, process.env.API_SECRET];
-
-		if (!API_KEY || API_KEY.length <= 5) {
-			throw new Error("API KEY is not defined!");
-		}
-		if (!API_SECRET || API_SECRET.length <= 5) {
-			throw new Error("API SECRET is not defined!");
-		}
-		const wsClient = new WebsocketClient(
-			{
-				api_key: API_KEY,
-				api_secret: API_SECRET,
-				beautify: true,
-				//disableHeartbeat: true
-			},
-			logger
-		);
-
-		wsClient.on("formattedMessage", async (data) => {
-			const formattedMessage = JSON.stringify(data, null, 2);
-
-			const { order } = JSON.parse(formattedMessage);
-
-			if (order?.orderStatus !== undefined && order.orderStatus === "FILLED") {
-				let roundByDecimals = 0;
-				const filledPrice = order.lastFilledPrice as number;
-				if (filledPrice >= 1_000) {
-					roundByDecimals = 100;
-				} else if (filledPrice >= 5) {
-					roundByDecimals = 1_000;
-				} else {
-					roundByDecimals = 10_000;
-				}
-				const takeProfitPrice =
-					Math.round((order.lastFilledPrice as number) * (1 + TAKE_PROFIT_PERCENTAGE) * roundByDecimals) / roundByDecimals;
-
-				const tpOrder = await client.submitNewOrder({
-					symbol: order.symbol as string,
-					side: "SELL",
-					positionSide: "BOTH",
-					//@TODO discuss with gambid
-					type: "TAKE_PROFIT_MARKET",
-					reduceOnly: "true",
-					//@ts-ignore
-					firstTrigger: "PLACE_ODER",
-					quantity: order.lastFilledQuantity as number,
-					stopPrice: takeProfitPrice,
-					timeInForce: "GTC",
-					workingType: "MARK_PRICE",
-					priceProtect: "TRUE",
-				});
-				console.log(color.green(`Successfully set TP order @${takeProfitPrice} (+${TAKE_PROFIT_PERCENTAGE * 100}%)`));
-			}
-		});
-
-		wsClient.subscribeUsdFuturesUserDataStream();
-	} catch (err) {
-		console.log(color.red("err"), err);
-	}
-}
+app.listen(DIGITALOCEAN_PORT);
 
 (async () => {
 	try {
@@ -125,8 +36,12 @@ async function webSocket(client: USDMClient) {
 			undefined,
 			TESTNET
 		);
+
+		//when starting the script, we want to, for security, make sure that all open orders are cancelled
+		await cancelAllOpenBasketOrders(client);
+
 		//this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
-		await webSocket(client);
+		await usdmarginedWebSocket(client);
 
 		//trigger postOrders initially
 		await postOrdersForBasket(client);
@@ -134,7 +49,12 @@ async function webSocket(client: USDMClient) {
 		//start interval
 
 		setInterval(async () => {
-			//@add postOrdersForBasket & cancelAllOpenOrdersForBasket
+			console.log(`start interval... (runs every ${POSITION_ADJUSTMENT_INTERVAL / 60} minutes) `);
+			//cancel all open orders
+			await cancelAllOpenBasketOrders(client);
+
+			//triggers new orders
+			await postOrdersForBasket(client);
 		}, POSITION_ADJUSTMENT_INTERVAL * 1000);
 	} catch (err) {
 		console.log(color.redBright("ERROR:"), err);
