@@ -12,6 +12,40 @@ export async function cancelAllOpenBasketOrders(client: USDMClient): Promise<voi
 		}
 	}
 }
+interface Decimals {
+	roundByDecimals: number;
+	quantityDecimals: number;
+}
+function getDecimals(markPrice: number): Decimals {
+	//different coins have different price decimals & position decimals
+	let roundByDecimals = 0;
+	let quantityDecimals = 0;
+	if (markPrice >= 5) {
+		roundByDecimals = 100;
+	} else if (markPrice >= 5) {
+		roundByDecimals = 1_000;
+	} else if (markPrice <= 1 && markPrice >= 0.05) {
+		//doge 0.16729
+		roundByDecimals = 100_000;
+	} else {
+		roundByDecimals = 1_000_000;
+		//pepe 0.022595
+		//bonk 0.022595
+		//bome 0.013984
+	}
+
+	if (markPrice >= 1000) {
+		quantityDecimals = 1_000;
+	} else {
+		//meaning, it won't format the min quantity (not relevant prob, since pos sizes will anyways be large enough)
+		quantityDecimals = 1;
+	}
+
+	return {
+		roundByDecimals,
+		quantityDecimals,
+	};
+}
 
 export async function postOrdersForBasket(client: USDMClient): Promise<void> {
 	console.log("posting orders for basket...");
@@ -32,22 +66,7 @@ export async function postOrdersForBasket(client: USDMClient): Promise<void> {
 
 		const markPrice = parseFloat(fetchedTicker.markPrice as string);
 
-		//different coins have different price decimals & position decimals
-		let roundByDecimals = 0;
-
-		if (markPrice >= 5) {
-			roundByDecimals = 100;
-		} else if (markPrice >= 5) {
-			roundByDecimals = 1_000;
-		} else {
-			roundByDecimals = 10_000;
-		}
-		let quantityDecimals = 0;
-		if (markPrice >= 1000) {
-			quantityDecimals = 1_000;
-		} else {
-			quantityDecimals = 1;
-		}
+		const { roundByDecimals, quantityDecimals } = getDecimals(markPrice);
 
 		const bidPrice = Math.round(markPrice * (1 - MARK_PRICE_DISCOUNT_RATE) * roundByDecimals) / roundByDecimals;
 		const stopLossPrice = Math.round(bidPrice * (1 - STOP_LOSS_PERCENTAGE) * roundByDecimals) / roundByDecimals;
@@ -132,16 +151,9 @@ export async function usdmarginedWebSocket(client: USDMClient) {
 
 			const { order } = JSON.parse(formattedMessage);
 
-			if (order?.orderStatus !== undefined && order.orderStatus === "FILLED") {
-				let roundByDecimals = 0;
+			if ((order?.orderStatus !== undefined && order.orderStatus === "FILLED") || order.orderStatus === "PARTIALLY_FILLED") {
 				const filledPrice = order.lastFilledPrice as number;
-				if (filledPrice >= 1_000) {
-					roundByDecimals = 100;
-				} else if (filledPrice >= 5) {
-					roundByDecimals = 1_000;
-				} else {
-					roundByDecimals = 10_000;
-				}
+				const { roundByDecimals } = getDecimals(filledPrice);
 				const takeProfitPrice =
 					Math.round((order.lastFilledPrice as number) * (1 + TAKE_PROFIT_PERCENTAGE) * roundByDecimals) / roundByDecimals;
 

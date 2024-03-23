@@ -1,4 +1,15 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -39,7 +50,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.postOrdersForBasket = exports.cancelAllOpenBasketOrders = void 0;
+exports.usdmarginedWebSocket = exports.postOrdersForBasket = exports.cancelAllOpenBasketOrders = void 0;
+var binance_1 = require("binance");
 var config_1 = require("./config");
 var ansi_colors_1 = __importDefault(require("ansi-colors"));
 function cancelAllOpenBasketOrders(client) {
@@ -70,11 +82,43 @@ function cancelAllOpenBasketOrders(client) {
     });
 }
 exports.cancelAllOpenBasketOrders = cancelAllOpenBasketOrders;
+function getDecimals(markPrice) {
+    //different coins have different price decimals & position decimals
+    var roundByDecimals = 0;
+    var quantityDecimals = 0;
+    if (markPrice >= 5) {
+        roundByDecimals = 100;
+    }
+    else if (markPrice >= 5) {
+        roundByDecimals = 1000;
+    }
+    else if (markPrice <= 1 && markPrice >= 0.05) {
+        //doge 0.16729
+        roundByDecimals = 100000;
+    }
+    else {
+        roundByDecimals = 1000000;
+        //pepe 0.022595
+        //bonk 0.022595
+        //bome 0.013984
+    }
+    if (markPrice >= 1000) {
+        quantityDecimals = 1000;
+    }
+    else {
+        //meaning, it won't format the min quantity (not relevant prob, since pos sizes will anyways be large enough)
+        quantityDecimals = 1;
+    }
+    return {
+        roundByDecimals: roundByDecimals,
+        quantityDecimals: quantityDecimals,
+    };
+}
 function postOrdersForBasket(client) {
     return __awaiter(this, void 0, void 0, function () {
-        var positionSizeForEachTicker, _i, TICKER_BASKET_2, ticker, fetchedTicker, markPrice, roundByDecimals, quantityDecimals, bidPrice, stopLossPrice, quantity, order;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
+        var positionSizeForEachTicker, _i, TICKER_BASKET_2, ticker, fetchedTicker, markPrice, _a, roundByDecimals, quantityDecimals, bidPrice, stopLossPrice, quantity, order;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
                 case 0:
                     console.log("posting orders for basket...");
                     if (config_1.TICKER_BASKET.length < 1) {
@@ -85,32 +129,16 @@ function postOrdersForBasket(client) {
                     }
                     positionSizeForEachTicker = Math.round((config_1.TOTAL_POSITION_SIZE_USD / config_1.TICKER_BASKET.length) * 100) / 100;
                     _i = 0, TICKER_BASKET_2 = config_1.TICKER_BASKET;
-                    _a.label = 1;
+                    _b.label = 1;
                 case 1:
                     if (!(_i < TICKER_BASKET_2.length)) return [3 /*break*/, 5];
                     ticker = TICKER_BASKET_2[_i];
                     console.log("posting order for: ", ticker);
                     return [4 /*yield*/, client.getMarkPrice({ symbol: ticker, isIsolated: "FALSE" })];
                 case 2:
-                    fetchedTicker = (_a.sent());
+                    fetchedTicker = (_b.sent());
                     markPrice = parseFloat(fetchedTicker.markPrice);
-                    roundByDecimals = 0;
-                    if (markPrice >= 5) {
-                        roundByDecimals = 100;
-                    }
-                    else if (markPrice >= 5) {
-                        roundByDecimals = 1000;
-                    }
-                    else {
-                        roundByDecimals = 10000;
-                    }
-                    quantityDecimals = 0;
-                    if (markPrice >= 1000) {
-                        quantityDecimals = 1000;
-                    }
-                    else {
-                        quantityDecimals = 1;
-                    }
+                    _a = getDecimals(markPrice), roundByDecimals = _a.roundByDecimals, quantityDecimals = _a.quantityDecimals;
                     bidPrice = Math.round(markPrice * (1 - config_1.MARK_PRICE_DISCOUNT_RATE) * roundByDecimals) / roundByDecimals;
                     stopLossPrice = Math.round(bidPrice * (1 - config_1.STOP_LOSS_PERCENTAGE) * roundByDecimals) / roundByDecimals;
                     quantity = Math.round((positionSizeForEachTicker / bidPrice) * quantityDecimals) / quantityDecimals;
@@ -142,11 +170,11 @@ function postOrdersForBasket(client) {
                             },
                         ])];
                 case 3:
-                    order = _a.sent();
+                    order = _b.sent();
                     if (order.length > 0) {
                         console.log(ansi_colors_1.default.greenBright("Successfully set ".concat(ticker, " bid @").concat(bidPrice, " for $").concat(positionSizeForEachTicker, " notional, with SL at ").concat(stopLossPrice, " (-").concat(config_1.STOP_LOSS_PERCENTAGE * 100, "%)")));
                     }
-                    _a.label = 4;
+                    _b.label = 4;
                 case 4:
                     _i++;
                     return [3 /*break*/, 1];
@@ -156,3 +184,75 @@ function postOrdersForBasket(client) {
     });
 }
 exports.postOrdersForBasket = postOrdersForBasket;
+var ignoredSillyLogMsgs = ["Sending ping", "Received pong, clearing pong timer", "Received ping, sending pong frame"];
+var logger = __assign(__assign({}, binance_1.DefaultLogger), { 
+    //@ts-expect-error
+    silly: function (msg, context) {
+        if (ignoredSillyLogMsgs.includes(msg)) {
+            return;
+        }
+        console.log(JSON.stringify({ msg: msg, context: context }));
+    } });
+function usdmarginedWebSocket(client) {
+    return __awaiter(this, void 0, void 0, function () {
+        var _a, API_KEY, API_SECRET, wsClient;
+        var _this = this;
+        return __generator(this, function (_b) {
+            try {
+                _a = [process.env.API_KEY, process.env.API_SECRET], API_KEY = _a[0], API_SECRET = _a[1];
+                if (!API_KEY || API_KEY.length <= 5) {
+                    throw new Error("API KEY is not defined!");
+                }
+                if (!API_SECRET || API_SECRET.length <= 5) {
+                    throw new Error("API SECRET is not defined!");
+                }
+                wsClient = new binance_1.WebsocketClient({
+                    api_key: API_KEY,
+                    api_secret: API_SECRET,
+                    beautify: true,
+                    //disableHeartbeat: true
+                }, logger);
+                wsClient.on("formattedMessage", function (data) { return __awaiter(_this, void 0, void 0, function () {
+                    var formattedMessage, order, filledPrice, roundByDecimals, takeProfitPrice;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                formattedMessage = JSON.stringify(data, null, 2);
+                                order = JSON.parse(formattedMessage).order;
+                                if (!(((order === null || order === void 0 ? void 0 : order.orderStatus) !== undefined && order.orderStatus === "FILLED") || order.orderStatus === "PARTIALLY_FILLED")) return [3 /*break*/, 2];
+                                filledPrice = order.lastFilledPrice;
+                                roundByDecimals = getDecimals(filledPrice).roundByDecimals;
+                                takeProfitPrice = Math.round(order.lastFilledPrice * (1 + config_1.TAKE_PROFIT_PERCENTAGE) * roundByDecimals) / roundByDecimals;
+                                return [4 /*yield*/, client.submitNewOrder({
+                                        symbol: order.symbol,
+                                        side: "SELL",
+                                        positionSide: "BOTH",
+                                        //@TODO discuss with gambid
+                                        type: "TAKE_PROFIT_MARKET",
+                                        reduceOnly: "true",
+                                        //@ts-ignore
+                                        firstTrigger: "PLACE_ODER",
+                                        quantity: order.lastFilledQuantity,
+                                        stopPrice: takeProfitPrice,
+                                        timeInForce: "GTC",
+                                        workingType: "MARK_PRICE",
+                                        priceProtect: "TRUE",
+                                    })];
+                            case 1:
+                                _a.sent();
+                                console.log(ansi_colors_1.default.green("Successfully set TP order @".concat(takeProfitPrice, " (+").concat(config_1.TAKE_PROFIT_PERCENTAGE * 100, "%)")));
+                                _a.label = 2;
+                            case 2: return [2 /*return*/];
+                        }
+                    });
+                }); });
+                wsClient.subscribeUsdFuturesUserDataStream();
+            }
+            catch (err) {
+                console.log(ansi_colors_1.default.red("err"), err);
+            }
+            return [2 /*return*/];
+        });
+    });
+}
+exports.usdmarginedWebSocket = usdmarginedWebSocket;
