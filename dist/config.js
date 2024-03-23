@@ -14,7 +14,7 @@ exports.POSITION_ADJUSTMENT_INTERVAL = 3600;
  * @in greater than 0 & less than 1
  */
 exports.MARK_PRICE_DISCOUNT_RATE = 0.2;
-exports.TICKER_BASKET = ["ETHUSDT"];
+exports.TICKER_BASKET = ["ETHUSDT", "WIFUSDT", "DOGEUSDT", "FTM1USDT"];
 // Represented as decimals: 1% => 0.01
 exports.STOP_LOSS_PERCENTAGE = 0.05;
 exports.TAKE_PROFIT_PERCENTAGE = 0.20;

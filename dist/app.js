@@ -1,4 +1,15 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -74,11 +85,11 @@ function cancelAllOpenOrdersForBasket(client) {
 }
 function postOrdersForBasket(client) {
     return __awaiter(this, void 0, void 0, function () {
-        var positionSizeForEachTicker, _i, TICKER_BASKET_2, ticker, fetchedTicker, markPrice, roundByDecimals, bidPrice, stopLossPrice, takeProfitPrice, quantity, postedBuyOrder;
+        var positionSizeForEachTicker, _i, TICKER_BASKET_2, ticker, fetchedTicker, markPrice, roundByDecimals, quantityDecimals, bidPrice, stopLossPrice, quantity, order;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    console.log("postOrdersForBasket");
+                    console.log("posting orders for basket...");
                     if (config_1.TICKER_BASKET.length < 1) {
                         throw new Error("Define at least one ticker in TICKER_BASKET.");
                     }
@@ -95,19 +106,9 @@ function postOrdersForBasket(client) {
                     return [4 /*yield*/, client.getMarkPrice({ symbol: ticker, isIsolated: "FALSE" })];
                 case 2:
                     fetchedTicker = (_a.sent());
-                    console.log("fetchedMarkPrice", fetchedTicker);
                     markPrice = parseFloat(fetchedTicker.markPrice);
-                    console.log({ markPrice: markPrice });
                     roundByDecimals = 0;
-                    //@Todo accurately decide on number of decimals to bid for ticker.
-                    //for the initial version of the script we just take two decimals for mark prices equal or over 1'000
-                    //SUI: 1.6828
-                    //SOL: 175.047 x
-                    //DOGE: 0.16756
-                    //FTM: 1.0786 x
-                    //TIA: 13.6358
-                    //AVAX: 54.834
-                    if (markPrice >= 1000) {
+                    if (markPrice >= 5) {
                         roundByDecimals = 100;
                     }
                     else if (markPrice >= 5) {
@@ -116,11 +117,16 @@ function postOrdersForBasket(client) {
                     else {
                         roundByDecimals = 10000;
                     }
+                    quantityDecimals = 0;
+                    if (markPrice >= 1000) {
+                        quantityDecimals = 1000;
+                    }
+                    else {
+                        quantityDecimals = 1;
+                    }
                     bidPrice = Math.round(markPrice * (1 - config_1.MARK_PRICE_DISCOUNT_RATE) * roundByDecimals) / roundByDecimals;
                     stopLossPrice = Math.round(bidPrice * (1 - config_1.STOP_LOSS_PERCENTAGE) * roundByDecimals) / roundByDecimals;
-                    takeProfitPrice = Math.round(bidPrice * (1 + config_1.TAKE_PROFIT_PERCENTAGE) * roundByDecimals) / roundByDecimals;
-                    quantity = Math.round((config_1.TOTAL_POSITION_SIZE_USD / bidPrice) * roundByDecimals) / roundByDecimals;
-                    console.log({ quantity: quantity, bidPrice: bidPrice, stopLossPrice: stopLossPrice, takeProfitPrice: takeProfitPrice });
+                    quantity = Math.round((positionSizeForEachTicker / bidPrice) * quantityDecimals) / quantityDecimals;
                     return [4 /*yield*/, client.submitMultipleOrders([
                             //post buy order
                             {
@@ -143,50 +149,104 @@ function postOrdersForBasket(client) {
                                 reduceOnly: "true",
                                 quantity: quantity.toString(),
                                 stopPrice: stopLossPrice.toString(),
-                                timeInForce: "GTE_GTC",
-                                workingType: "MARK_PRICE",
-                                priceProtect: "TRUE",
-                            },
-                            //post TP
-                            // {
-                            // 	symbol: ticker,
-                            // 	side: "SELL",
-                            // 	positionSide: "BOTH",
-                            // 	//@TODO discuss with gambid
-                            // 	type: "TAKE_PROFIT_MARKET",
-                            // 	reduceOnly: "true",
-                            // 	//@ts-ignore
-                            // 	firstTrigger: "PLACE_ODER",
-                            // 	quantity: quantity.toString(),
-                            // 	stopPrice: takeProfitPrice.toString(),
-                            // 	timeInForce: "GTE_GTC",
-                            // 	workingType: "MARK_PRICE",
-                            // 	priceProtect: "TRUE",
-                            // },
-                            //post TP
-                            {
-                                symbol: ticker,
-                                side: "SELL",
-                                positionSide: "BOTH",
-                                //@TODO discuss with gambid
-                                type: "LIMIT",
-                                price: takeProfitPrice.toString(),
-                                reduceOnly: "true",
-                                quantity: quantity.toString(),
                                 timeInForce: "GTC",
                                 workingType: "MARK_PRICE",
                                 priceProtect: "TRUE",
                             },
                         ])];
                 case 3:
-                    postedBuyOrder = _a.sent();
-                    console.log({ postedBuyOrder: postedBuyOrder });
+                    order = _a.sent();
+                    if (order.length > 0) {
+                        console.log(ansi_colors_1.default.greenBright("Successfully set ".concat(ticker, " bid @").concat(bidPrice, " for $").concat(positionSizeForEachTicker, " notional, with SL at ").concat(stopLossPrice, " (-").concat(config_1.STOP_LOSS_PERCENTAGE * 100, "%)")));
+                    }
                     _a.label = 4;
                 case 4:
                     _i++;
                     return [3 /*break*/, 1];
                 case 5: return [2 /*return*/];
             }
+        });
+    });
+}
+var ignoredSillyLogMsgs = ["Sending ping", "Received pong, clearing pong timer", "Received ping, sending pong frame"];
+var logger = __assign(__assign({}, binance_1.DefaultLogger), { 
+    //@ts-expect-error
+    silly: function (msg, context) {
+        if (ignoredSillyLogMsgs.includes(msg)) {
+            return;
+        }
+        console.log(JSON.stringify({ msg: msg, context: context }));
+    } });
+function webSocket(client) {
+    return __awaiter(this, void 0, void 0, function () {
+        var _a, API_KEY, API_SECRET, wsClient;
+        var _this = this;
+        return __generator(this, function (_b) {
+            try {
+                _a = [process.env.API_KEY, process.env.API_SECRET], API_KEY = _a[0], API_SECRET = _a[1];
+                if (!API_KEY || API_KEY.length <= 5) {
+                    throw new Error("API KEY is not defined!");
+                }
+                if (!API_SECRET || API_SECRET.length <= 5) {
+                    throw new Error("API SECRET is not defined!");
+                }
+                wsClient = new binance_1.WebsocketClient({
+                    api_key: API_KEY,
+                    api_secret: API_SECRET,
+                    beautify: true,
+                    // Disable ping/pong ws heartbeat mechanism (not recommended)
+                    // disableHeartbeat: true
+                }, logger);
+                wsClient.on("formattedMessage", function (data) { return __awaiter(_this, void 0, void 0, function () {
+                    var formattedMessage, order, roundByDecimals, filledPrice, takeProfitPrice, tpOrder;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                formattedMessage = JSON.stringify(data, null, 2);
+                                order = JSON.parse(formattedMessage).order;
+                                console.log("order", order);
+                                if (!((order === null || order === void 0 ? void 0 : order.orderStatus) !== undefined && order.orderStatus === "FILLED")) return [3 /*break*/, 2];
+                                roundByDecimals = 0;
+                                filledPrice = order.lastFilledPrice;
+                                if (filledPrice >= 1000) {
+                                    roundByDecimals = 100;
+                                }
+                                else if (filledPrice >= 5) {
+                                    roundByDecimals = 1000;
+                                }
+                                else {
+                                    roundByDecimals = 10000;
+                                }
+                                takeProfitPrice = Math.round(order.lastFilledPrice * (1 + config_1.TAKE_PROFIT_PERCENTAGE) * roundByDecimals) / roundByDecimals;
+                                return [4 /*yield*/, client.submitNewOrder({
+                                        symbol: order.symbol,
+                                        side: "SELL",
+                                        positionSide: "BOTH",
+                                        //@TODO discuss with gambid
+                                        type: "TAKE_PROFIT_MARKET",
+                                        reduceOnly: "true",
+                                        //@ts-ignore
+                                        firstTrigger: "PLACE_ODER",
+                                        quantity: order.lastFilledQuantity,
+                                        stopPrice: takeProfitPrice,
+                                        timeInForce: "GTC",
+                                        workingType: "MARK_PRICE",
+                                        priceProtect: "TRUE",
+                                    })];
+                            case 1:
+                                tpOrder = _a.sent();
+                                console.log(ansi_colors_1.default.blueBright("ORDER: "), tpOrder);
+                                _a.label = 2;
+                            case 2: return [2 /*return*/];
+                        }
+                    });
+                }); });
+                wsClient.subscribeUsdFuturesUserDataStream();
+            }
+            catch (err) {
+                console.log("err", err);
+            }
+            return [2 /*return*/];
         });
     });
 }
@@ -208,9 +268,11 @@ function postOrdersForBasket(client) {
                     api_key: API_KEY,
                     api_secret: API_SECRET,
                 }, undefined, config_1.TESTNET);
+                // await webSocket(client);
                 //trigger postOrders initially
                 return [4 /*yield*/, postOrdersForBasket(client)];
             case 1:
+                // await webSocket(client);
                 //trigger postOrders initially
                 _b.sent();
                 //start interval

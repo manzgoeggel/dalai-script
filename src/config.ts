@@ -14,7 +14,7 @@ export const POSITION_ADJUSTMENT_INTERVAL: number = 3_600;
  */
 export const MARK_PRICE_DISCOUNT_RATE: number = 0.2;
 
-export const TICKER_BASKET: string[] = ["ETHUSDT"];
+export const TICKER_BASKET: string[] = ["ETHUSDT", "WIFUSDT", "DOGEUSDT", "FTMUSDT"];
 
 // Represented as decimals: 1% => 0.01
 export const STOP_LOSS_PERCENTAGE: number = 0.05;
