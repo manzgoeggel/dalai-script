@@ -40,6 +40,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
 
 		// Handle webhook logic here
 		if (payload.event === "summer_news_e83664255c6963e962bb20f9fcfaad") {
+			console.log("NEW EVENT: ", payload.data)
 			//@TODO add logic to determine, whether criteria are fulfilled to open a position
 			//If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
 		}
