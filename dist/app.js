@@ -40,80 +40,46 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var ansi_colors_1 = __importDefault(require("ansi-colors"));
-var binance_1 = require("binance");
 var dotenv_1 = __importDefault(require("dotenv"));
 var config_1 = require("./config");
-var modules_1 = require("./modules");
 var express_1 = __importDefault(require("express"));
 dotenv_1.default.config();
+console.log(ansi_colors_1.default.green("server is on!"));
 //create a http server for the health checks (digital ocean)
 var app = (0, express_1.default)();
 app.get("/", function (req, res) {
     res.send("server is on at port ".concat(config_1.DIGITALOCEAN_PORT));
 });
 app.listen(config_1.DIGITALOCEAN_PORT);
-(function () { return __awaiter(void 0, void 0, void 0, function () {
-    var _a, API_KEY, API_SECRET, client_1, err_1;
-    return __generator(this, function (_b) {
-        switch (_b.label) {
-            case 0:
-                _b.trys.push([0, 5, , 6]);
-                console.log(config_1.TESTNET ? ansi_colors_1.default.yellowBright("TESTNET Mode") : ansi_colors_1.default.greenBright("MAINNET Mode (you'll gamble with real money!"));
-                _a = [process.env.API_KEY, process.env.API_SECRET], API_KEY = _a[0], API_SECRET = _a[1];
-                if (!API_KEY || API_KEY.length <= 5) {
-                    throw new Error("API KEY is not defined!");
-                }
-                if (!API_SECRET || API_SECRET.length <= 5) {
-                    throw new Error("API SECRET is not defined!");
-                }
-                client_1 = new binance_1.USDMClient({
-                    api_key: API_KEY,
-                    api_secret: API_SECRET,
-                }, undefined, config_1.TESTNET);
-                //when starting the script, we want to, for security, make sure that all open orders are cancelled
-                return [4 /*yield*/, (0, modules_1.cancelAllOpenBasketOrders)(client_1)];
-            case 1:
-                //when starting the script, we want to, for security, make sure that all open orders are cancelled
-                _b.sent();
-                if (!!config_1.MANUALLY_CLOSE_POSITIONS) return [3 /*break*/, 3];
-                //this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
-                return [4 /*yield*/, (0, modules_1.usdmarginedWebSocket)(client_1)];
-            case 2:
-                //this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
-                _b.sent();
-                _b.label = 3;
-            case 3: 
-            //trigger postOrders initially
-            return [4 /*yield*/, (0, modules_1.postOrdersForBasket)(client_1)];
-            case 4:
-                //trigger postOrders initially
-                _b.sent();
-                //start interval
-                setInterval(function () { return __awaiter(void 0, void 0, void 0, function () {
-                    return __generator(this, function (_a) {
-                        switch (_a.label) {
-                            case 0:
-                                console.log("start interval... (runs every ".concat(config_1.POSITION_ADJUSTMENT_INTERVAL / 60, " minutes) "));
-                                //cancel all open orders
-                                return [4 /*yield*/, (0, modules_1.cancelAllOpenBasketOrders)(client_1)];
-                            case 1:
-                                //cancel all open orders
-                                _a.sent();
-                                //triggers new orders
-                                return [4 /*yield*/, (0, modules_1.postOrdersForBasket)(client_1)];
-                            case 2:
-                                //triggers new orders
-                                _a.sent();
-                                return [2 /*return*/];
-                        }
-                    });
-                }); }, config_1.POSITION_ADJUSTMENT_INTERVAL * 1000);
-                return [3 /*break*/, 6];
-            case 5:
-                err_1 = _b.sent();
-                console.log(ansi_colors_1.default.redBright("ERROR:"), err_1);
-                return [3 /*break*/, 6];
-            case 6: return [2 /*return*/];
+// Webhook endpoint with correct Express types
+app.post("/webhook", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var payload;
+    return __generator(this, function (_a) {
+        try {
+            payload = req.body;
+            // Basic validation
+            if (!payload.event || !payload.timestamp) {
+                return [2 /*return*/, res.status(400).json({
+                        error: "Invalid webhook payload - missing required fields",
+                    })];
+            }
+            // Log incoming webhook
+            console.log("Received webhook: ".concat(payload.event), {
+                timestamp: new Date(payload.timestamp).toISOString(),
+                data: payload.data,
+            });
+            // Handle webhook logic here
+            if (payload.event === "summer_news_e83664255c6963e962bb20f9fcfaad") {
+                //@TODO add logic to determine, whether criteria are fulfilled to open a position
+                //If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
+            }
         }
+        catch (error) {
+            console.error("Error processing webhook:", error);
+            res.status(500).json({
+                error: "Internal server error processing webhook",
+            });
+        }
+        return [2 /*return*/];
     });
-}); })();
+}); });

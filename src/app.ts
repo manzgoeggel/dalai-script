@@ -3,8 +3,14 @@ import { USDMClient } from "binance";
 import dotenv from "dotenv";
 import { DIGITALOCEAN_PORT, MANUALLY_CLOSE_POSITIONS, POSITION_ADJUSTMENT_INTERVAL, TESTNET } from "./config";
 import { cancelAllOpenBasketOrders, postOrdersForBasket, usdmarginedWebSocket } from "./modules";
-import express from "express";
+import express, { Express, Request, Response } from "express";
 dotenv.config();
+console.log(color.green("server is on!"));
+interface WebhookPayload {
+	event: string;
+	data: any;
+	timestamp: number;
+}
 
 //create a http server for the health checks (digital ocean)
 const app = express();
@@ -14,51 +20,33 @@ app.get("/", (req, res) => {
 
 app.listen(DIGITALOCEAN_PORT);
 
-(async () => {
+// Webhook endpoint with correct Express types
+app.post("/webhook", async (req: Request, res: Response) => {
 	try {
-		console.log(TESTNET ? color.yellowBright("TESTNET Mode") : color.greenBright("MAINNET Mode (you'll gamble with real money!"));
+		const payload: WebhookPayload = req.body;
 
-		const [API_KEY, API_SECRET]: (string | undefined)[] = [process.env.API_KEY, process.env.API_SECRET];
-
-		if (!API_KEY || API_KEY.length <= 5) {
-			throw new Error("API KEY is not defined!");
-		}
-		if (!API_SECRET || API_SECRET.length <= 5) {
-			throw new Error("API SECRET is not defined!");
+		// Basic validation
+		if (!payload.event || !payload.timestamp) {
+			return res.status(400).json({
+				error: "Invalid webhook payload - missing required fields",
+			});
 		}
 
-		//initiate exchange client
-		const client = new USDMClient(
-			{
-				api_key: API_KEY,
-				api_secret: API_SECRET,
-			},
-			undefined,
-			TESTNET
-		);
+		// Log incoming webhook
+		console.log(`Received webhook: ${payload.event}`, {
+			timestamp: new Date(payload.timestamp).toISOString(),
+			data: payload.data,
+		});
 
-		//when starting the script, we want to, for security, make sure that all open orders are cancelled
-		await cancelAllOpenBasketOrders(client);
-
-		if (!MANUALLY_CLOSE_POSITIONS) {
-			//this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
-			await usdmarginedWebSocket(client);
+		// Handle webhook logic here
+		if (payload.event === "summer_news_e83664255c6963e962bb20f9fcfaad") {
+			//@TODO add logic to determine, whether criteria are fulfilled to open a position
+			//If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
 		}
-
-		//trigger postOrders initially
-		await postOrdersForBasket(client);
-
-		//start interval
-
-		setInterval(async () => {
-			console.log(`start interval... (runs every ${POSITION_ADJUSTMENT_INTERVAL / 60} minutes) `);
-			//cancel all open orders
-			await cancelAllOpenBasketOrders(client);
-
-			//triggers new orders
-			await postOrdersForBasket(client);
-		}, POSITION_ADJUSTMENT_INTERVAL * 1000);
-	} catch (err) {
-		console.log(color.redBright("ERROR:"), err);
+	} catch (error) {
+		console.error("Error processing webhook:", error);
+		res.status(500).json({
+			error: "Internal server error processing webhook",
+		});
 	}
-})();
+});
