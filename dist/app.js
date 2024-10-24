@@ -43,7 +43,43 @@ var ansi_colors_1 = __importDefault(require("ansi-colors"));
 var dotenv_1 = __importDefault(require("dotenv"));
 var config_1 = require("./config");
 var express_1 = __importDefault(require("express"));
+var openai_1 = __importDefault(require("openai"));
 dotenv_1.default.config();
+var openai = new openai_1.default({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+(function () { return __awaiter(void 0, void 0, void 0, function () {
+    var tweet, completion, err_1;
+    return __generator(this, function (_a) {
+        switch (_a.label) {
+            case 0:
+                _a.trys.push([0, 2, , 3]);
+                tweet = "Israel nukes the shithole called 'Iran' completely";
+                return [4 /*yield*/, openai.chat.completions.create({
+                        model: "gpt-4o-mini",
+                        messages: [
+                            {
+                                role: "system",
+                                content: config_1.PROMPT,
+                            },
+                            {
+                                role: "user",
+                                content: "Tweet: ".concat(tweet),
+                            },
+                        ],
+                    })];
+            case 1:
+                completion = _a.sent();
+                console.log(completion.choices[0].message);
+                return [3 /*break*/, 3];
+            case 2:
+                err_1 = _a.sent();
+                console.log({ err: err_1 });
+                return [3 /*break*/, 3];
+            case 3: return [2 /*return*/];
+        }
+    });
+}); })();
 //create a http server for the health checks (digital ocean)
 var app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -57,7 +93,6 @@ app.post("/webhook", function (req, res) { return __awaiter(void 0, void 0, void
     var payload;
     return __generator(this, function (_a) {
         try {
-            console.log(req.body);
             payload = req.body;
             // Basic validation
             if (!payload.eventToken || !payload.unixTimestamp) {
@@ -73,11 +108,11 @@ app.post("/webhook", function (req, res) { return __awaiter(void 0, void 0, void
             // Handle webhook logic here
             if (payload.eventToken === "summer_news_e83664255c6963e962bb20f9fcfaad") {
                 console.log("NEW EVENT: ", payload.data);
-                res.status(201).json({
-                    message: "OK"
-                });
                 //@TODO add logic to determine, whether criteria are fulfilled to open a position
                 //If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
+                res.status(201).json({
+                    message: "Successfully triggered",
+                });
             }
             throw new Error("Oops, something went wrong.");
         }

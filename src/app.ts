@@ -1,10 +1,37 @@
 import color from "ansi-colors";
 import { USDMClient } from "binance";
 import dotenv from "dotenv";
-import { DIGITALOCEAN_PORT, MANUALLY_CLOSE_POSITIONS, POSITION_ADJUSTMENT_INTERVAL, TESTNET } from "./config";
+import { DIGITALOCEAN_PORT, MANUALLY_CLOSE_POSITIONS, POSITION_ADJUSTMENT_INTERVAL, PROMPT, TESTNET } from "./config";
 import { cancelAllOpenBasketOrders, postOrdersForBasket, usdmarginedWebSocket } from "./modules";
 import express, { Express, Request, Response } from "express";
+import OpenAI from "openai";
 dotenv.config();
+
+const openai = new OpenAI({
+	apiKey: process.env.OPENAI_API_KEY,
+});
+
+(async () => {
+	try {
+		const tweet = "Israel nukes the shithole called 'Iran' completely";
+		const completion = await openai.chat.completions.create({
+			model: "gpt-4o-mini",
+			messages: [
+				{
+					role: "system",
+					content: PROMPT,
+				},
+				{
+					role: "user",
+					content: `Tweet: ${tweet}`,
+				},
+			],
+		});
+		console.log(completion.choices[0].message);
+	} catch (err) {
+		console.log({ err });
+	}
+})();
 
 //create a http server for the health checks (digital ocean)
 const app = express();
@@ -24,7 +51,6 @@ interface WebhookPayload {
 // Webhook endpoint with correct Express types
 app.post("/webhook", async (req: Request, res: Response) => {
 	try {
-		console.log(req.body);
 		const payload: WebhookPayload = req.body;
 
 		// Basic validation
