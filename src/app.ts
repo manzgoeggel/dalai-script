@@ -14,11 +14,11 @@ const openai = new OpenAI({
 //create a http server for the health checks (digital ocean)
 const app = express();
 app.use(express.json());
+app.listen(DIGITALOCEAN_PORT);
 app.get("/", (req, res) => {
 	res.send(`server is on at port ${DIGITALOCEAN_PORT}`);
 });
 
-app.listen(DIGITALOCEAN_PORT);
 console.log(color.green("server is on!"));
 interface WebhookPayload {
 	eventToken: string;
@@ -27,10 +27,9 @@ interface WebhookPayload {
 		tweetUrl: string;
 		location?: string;
 		translation?: string;
-	}
+	};
 	timestamp: number;
 	format: string;
-
 }
 
 // Webhook endpoint with correct Express types
@@ -40,9 +39,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
 
 		// Basic validation
 		if (!payload.eventToken || !payload.timestamp) {
-			return res.status(400).json({
-				error: "Invalid webhook payload - missing required fields",
-			});
+			throw new Error("no event token sent");
 		}
 
 		// Handle webhook logic here
@@ -70,6 +67,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
 			res.status(201).json({
 				message: "Successfully triggered",
 			});
+			return;
 		}
 		throw new Error("Oops, something went wrong.");
 	} catch (error) {

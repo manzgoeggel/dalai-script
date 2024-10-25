@@ -48,15 +48,32 @@ dotenv_1.default.config();
 var openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
-(function () { return __awaiter(void 0, void 0, void 0, function () {
-    var tweet, completion, err_1;
+//create a http server for the health checks (digital ocean)
+var app = (0, express_1.default)();
+app.use(express_1.default.json());
+app.listen(config_1.DIGITALOCEAN_PORT);
+app.get("/", function (req, res) {
+    res.send("server is on at port ".concat(config_1.DIGITALOCEAN_PORT));
+});
+console.log(ansi_colors_1.default.green("server is on!"));
+// Webhook endpoint with correct Express types
+app.post("/webhook", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var payload, completion, error_1;
     return __generator(this, function (_a) {
         switch (_a.label) {
             case 0:
-                _a.trys.push([0, 2, , 3]);
-                tweet = "Israel nukes the shithole called 'Iran' completely";
+                _a.trys.push([0, 3, , 4]);
+                payload = req.body;
+                // Basic validation
+                if (!payload.eventToken || !payload.timestamp) {
+                    return [2 /*return*/, res.status(400).json({
+                            error: "Invalid webhook payload - missing required fields",
+                        })];
+                }
+                if (!(payload.eventToken === "summer_news_e83664255c6963e962bb20f9fcfaad")) return [3 /*break*/, 2];
+                console.log("NEW EVENT: ", payload);
                 return [4 /*yield*/, openai.chat.completions.create({
-                        model: "gpt-4o-mini",
+                        model: "gpt-4o",
                         messages: [
                             {
                                 role: "system",
@@ -64,63 +81,27 @@ var openai = new openai_1.default({
                             },
                             {
                                 role: "user",
-                                content: "Tweet: ".concat(tweet),
+                                content: "Result: ".concat(payload.data.headline),
                             },
                         ],
                     })];
             case 1:
                 completion = _a.sent();
                 console.log(completion.choices[0].message);
-                return [3 /*break*/, 3];
-            case 2:
-                err_1 = _a.sent();
-                console.log({ err: err_1 });
-                return [3 /*break*/, 3];
-            case 3: return [2 /*return*/];
-        }
-    });
-}); })();
-//create a http server for the health checks (digital ocean)
-var app = (0, express_1.default)();
-app.use(express_1.default.json());
-app.get("/", function (req, res) {
-    res.send("server is on at port ".concat(config_1.DIGITALOCEAN_PORT));
-});
-app.listen(config_1.DIGITALOCEAN_PORT);
-console.log(ansi_colors_1.default.green("server is on!"));
-// Webhook endpoint with correct Express types
-app.post("/webhook", function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var payload;
-    return __generator(this, function (_a) {
-        try {
-            payload = req.body;
-            // Basic validation
-            if (!payload.eventToken || !payload.unixTimestamp) {
-                return [2 /*return*/, res.status(400).json({
-                        error: "Invalid webhook payload - missing required fields",
-                    })];
-            }
-            // Log incoming webhook
-            console.log("Received webhook: ".concat(payload.eventToken), {
-                timestamp: new Date(payload.unixTimestamp).toISOString(),
-                data: payload.data,
-            });
-            // Handle webhook logic here
-            if (payload.eventToken === "summer_news_e83664255c6963e962bb20f9fcfaad") {
-                console.log("NEW EVENT: ", payload.data);
                 //@TODO add logic to determine, whether criteria are fulfilled to open a position
                 //If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
                 res.status(201).json({
                     message: "Successfully triggered",
                 });
-            }
-            throw new Error("Oops, something went wrong.");
+                _a.label = 2;
+            case 2: throw new Error("Oops, something went wrong.");
+            case 3:
+                error_1 = _a.sent();
+                res.status(500).json({
+                    error: error_1.message,
+                });
+                return [3 /*break*/, 4];
+            case 4: return [2 /*return*/];
         }
-        catch (error) {
-            res.status(500).json({
-                error: error.message,
-            });
-        }
-        return [2 /*return*/];
     });
 }); });
