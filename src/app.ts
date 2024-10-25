@@ -21,11 +21,15 @@ app.get("/", (req, res) => {
 app.listen(DIGITALOCEAN_PORT);
 console.log(color.green("server is on!"));
 interface WebhookPayload {
-	eventToken: string;
-	headline: string;
-	tweetUrl: string;
+	event_token: string;
+	data: {
+		headline: string;
+		tweet_url: string;
+		location: string;
+	}
 	timestamp: number;
-	geolocation: string;
+	format: string;
+
 }
 
 // Webhook endpoint with correct Express types
@@ -34,14 +38,14 @@ app.post("/webhook", async (req: Request, res: Response) => {
 		const payload: WebhookPayload = req.body;
 
 		// Basic validation
-		if (!payload.eventToken || !payload.timestamp) {
+		if (!payload.event_token || !payload.timestamp) {
 			return res.status(400).json({
 				error: "Invalid webhook payload - missing required fields",
 			});
 		}
 
 		// Handle webhook logic here
-		if (payload.eventToken === "summer_news_e83664255c6963e962bb20f9fcfaad") {
+		if (payload.event_token === "summer_news_e83664255c6963e962bb20f9fcfaad") {
 			console.log("NEW EVENT: ", payload);
 
 			const completion = await openai.chat.completions.create({
@@ -53,7 +57,7 @@ app.post("/webhook", async (req: Request, res: Response) => {
 					},
 					{
 						role: "user",
-						content: `Result: ${payload.headline}`,
+						content: `Result: ${payload.data.headline}`,
 					},
 				],
 			});
