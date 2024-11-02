@@ -61,6 +61,10 @@ app.post("/webhook", async (req: Request, res: Response) => {
 			});
 			console.log(completion.choices[0].message);
 
+			if (completion.choices[0].message.content === "Sev3") {
+				console.log("BIG EVENT!")
+			}
+
 			//@TODO add logic to determine, whether criteria are fulfilled to open a position
 			//If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
 
