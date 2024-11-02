@@ -46,24 +46,24 @@ app.post("/webhook", async (req: Request, res: Response) => {
 		if (payload.eventToken === "summer_news_e83664255c6963e962bb20f9fcfaad") {
 			console.log("NEW EVENT: ", payload);
 
-			const completion = await openai.chat.completions.create({
-				model: "gpt-4o",
-				messages: [
-					{
-						role: "system",
-						content: PROMPT,
-					},
-					{
-						role: "user",
-						content: `Result: ${payload.data.headline}`,
-					},
-				],
-			});
-			console.log(completion.choices[0].message);
+			// const completion = await openai.chat.completions.create({
+			// 	model: "gpt-4o",
+			// 	messages: [
+			// 		{
+			// 			role: "system",
+			// 			content: PROMPT,
+			// 		},
+			// 		{
+			// 			role: "user",
+			// 			content: `Result: ${payload.data.headline}`,
+			// 		},
+			// 	],
+			// });
+			// console.log(completion.choices[0].message);
 
-			if (completion.choices[0].message.content === "Sev3") {
-				console.log("BIG EVENT!")
-			}
+			// if (completion.choices[0].message.content === "Sev3") {
+			// 	console.log("BIG EVENT!")
+			// }
 
 			//@TODO add logic to determine, whether criteria are fulfilled to open a position
 			//If criteria fullfilled, send post request to an array of different servers that trigger the opening of the desired position
