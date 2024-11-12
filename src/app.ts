@@ -44,6 +44,7 @@ app.listen(DIGITALOCEAN_PORT);
 			//this ws is crucial to set the TPs for the filled positions, as OTOCO orders aren't possibly via the Binance API
 			await usdmarginedWebSocket(client);
 		}
+		
 
 		//trigger postOrders initially
 		await postOrdersForBasket(client);
